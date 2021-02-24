@@ -2,6 +2,7 @@ var http = require('http');
 var fs = require('fs');
 const url = require('url');
 const mysql = require('mysql');
+const { connect } = require('http2');
 
 http.createServer(function (req, res) {
     var q = url.parse(req.url, true).query;
@@ -46,3 +47,19 @@ var con = mysql.createConnection({
       console.log("1 record inserted");
     });
   });
+
+
+ await connection.query('SELECT * FROM apikeys', (err, rows) => {
+    if(err) throw err;
+    console.log(rows);
+    if (rows.apikey == '' ) {
+        
+        connection.query('SELECT * FROM rooms', (err,rows) => {
+            console.log('Data modtaget db: ');
+            res.write(JSON.stringify(rows))
+            return res.end();
+        });
+        }
+    }
+)
+  
