@@ -4,10 +4,22 @@ const url = require('url');
 const mysql = require('mysql');
 const { connect } = require('http2');
 const { NOMEM } = require('dns');
-//var hasAcscess = await calls.check
 
+function CheckAPIKey(q, res, callback) {
+    con.query('SELECT * FROM apikeys WHERE apikey = "' + q.apikey + '"', (err, rows) => {
+        if (err) throw err;
+        console.log(rows);
 
-
+        try {
+            if (rows[0].apikey != '') {
+                callback(); //Kalder bagud til forige kode
+            }
+        } catch (error) {
+            console.log('error 401 unauthorized'); //wrong apikey
+        }
+    }
+    )
+}
 
 http.createServer(function (req, res) {
     var q = url.parse(req.url, true).query;
@@ -22,67 +34,52 @@ http.createServer(function (req, res) {
         console.log(q.apikey);
 
         //API check
-        con.query('SELECT * FROM apikeys WHERE apikey = "' + q.apikey + '"', (err, rows) => {
-            if (err) throw err;
-            console.log(rows);
+        /* con.query('SELECT * FROM apikeys WHERE apikey = "' + q.apikey + '"', (err, rows) => {
+             if (err) throw err;
+             console.log(rows);
+ 
+             try {
+                 if (rows[0].apikey != '') {
+                     console.log('Data fra server: ');
+                     con.query('SELECT * FROM rooms', (err, rows) => {
+                         res.write(JSON.stringify(rows))
+                         return res.end();
+                     });
+                 }
+             } catch (error) {
+                 console.log('error 401 unauthorized'); //forkert apikey
+             }
+         }
+         )*/
 
-            try {
-                if (rows[0].apikey != '') {
-                    console.log('Data fra server: ');
-                    con.query('SELECT * FROM rooms', (err, rows) => {
-                        res.write(JSON.stringify(rows))
-                        return res.end();
-                    });
-                }
-            } catch (error) {
-                console.log('error 401 unauthorized'); //forkert apikey
-            }
-        }
-        )
+        CheckAPIKey(q, res, () => {
+            console.log('Data fra server: ');
+            con.query('SELECT * FROM rooms', (err, rows) => {
+                res.write(JSON.stringify(rows))
+                return res.end();
+            });
+        })
         return;
 
-        //opgave 2
-    } else if (path === '/add') {
-        console.log(q.apikey);
+        //POST Bookings
+    } else if (path === '/add' && req.method === "POST") {
 
-        con.query('SELECT * FROM apikeys WHERE apikey = "' + q.apikey + '"', (err, rows) => {
-            if (err) throw err;
-            console.log(rows);
+        CheckAPIKey(q, res, () => {
+            let data = ''; //ikke ændre datatypen
 
-            //Try for ikke crash
-            try {
-                if (rows[0].apikey != '') {
+            req.on('data', chunk => {
+                data += chunk;
+            }).on('end', () => {
+                var newbooking = JSON.parse(data);
+                console.log(newbooking);
 
-                    let data = ''; //ikke ændre datatypen
-
-                    req.on('data', chunk => {
-                        data += chunk;
-                    })
-
-                    req.on('end', () => {
-
-                        var newbooking = JSON.parse(data);
-                        console.log(newbooking);
-
-                        /*
-                           console.log(JSON.parse(data).room_id);
-                           console.log(JSON.parse(data).bookedBy);
-                           console.log(JSON.parse(data).bookingday);
-                        */
-
-                        console.log('Data fra server: ');
-                        con.query(`INSERT INTO bookings (room_id, bookedBy, bookingDay) VALUES (${newbooking.room_id}, '${newbooking.bookedBy}', '${newbooking.bookingDay}')`, (err, rows) => {
-                            if (err) throw err; //error warning hanmdling check
-                            return res.end();
-                        });
-                    })
-
-                }
-            } catch (error) {
-                console.log('error 401 unauthorized'); //forkert apikey
-            }
-        }
-        )
+                console.log('Data fra server: ');
+                con.query(`INSERT INTO bookings (room_id, bookedBy, bookingDay) VALUES (${newbooking.room_id}, '${newbooking.bookedBy}', '${newbooking.bookingDay}')`, (err, rows) => {
+                    if (err) throw err;
+                    return res.end();
+                });
+            })
+        })
         return;
     }
 
@@ -90,33 +87,18 @@ http.createServer(function (req, res) {
     else if (path === '/bookings') {
         console.log(q.apikey);
 
-        con.query('SELECT * FROM apikeys WHERE apikey = "' + q.apikey + '"', (err, rows) => {
-            if (err) throw err;
-            console.log(rows);
-
-            try {
-                if (rows[0].apikey != '') {
-                    console.log('Data fra server: ');
-                    con.query(`SELECT * FROM bookings WHERE bookingDay = ${q.day || new Date().getDate()}` , (err, rows) => {
-                        res.write(JSON.stringify(rows))
-                        return res.end();
-                    });
-                }
-            } catch (error) {
-                console.log('error 401'); //forkert apikey
-            }
-        }
-        )
+        CheckAPIKey(q, res, () => {
+            con.query(`SELECT * FROM bookings WHERE bookingDay = ${q.day || new Date().getDate()}`, (err, rows) => {
+                res.write(JSON.stringify(rows))
+                if (err) throw err;
+                return res.end();
+            })
+        })
         return;
-    } 
-
+    }
     else {
         path = path.substring(1);
     }
-
-
-    console.log(path);
-
 
     console.log(path);
     fs.readFile(path, (err, data) => {
